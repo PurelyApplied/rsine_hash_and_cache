@@ -4,7 +4,7 @@ Content is hashed and compared against an existing library.
 If it is new, it is saved.  If not, the collision is noted.'''
 
 
-import os, time
+import os, sys, time
 import urllib.request as req
 
 class Data:
@@ -15,19 +15,19 @@ class Data:
         self.since_last_collision=0
         self.time_to_collide = []
         self.cache = set()
-    
+
     def __repr__(self):
         return "<Data +{}/-{}/!{}/n{}/t{}>".format(self.success, self.collide, self.failure, len(self.cache), self.since_last_collision)
 
     def has(self, key):
         return (str(key) in self.cache)
-    
+
     def add(self, key):
         self.cache.add(key)
-    
+
     def load(self, folder):
         self.cache.update(os.listdir(folder))
-            
+
     def data(self):
         s  = "Failure: {}\n".format(self.failure)
         s += "Success: {}\n".format(self.success)
@@ -36,7 +36,7 @@ class Data:
         s += "Recent Collisions: {}\n".format(self.time_to_collide[-5:])
         s += "Recent average: {}\n".format( sum(self.time_to_collide[-5:]) / len(self.time_to_collide[-5:]))
         return s
-    
+
 
 #%%
 def main(delay=5, repeat=1000000):
@@ -47,11 +47,9 @@ def main(delay=5, repeat=1000000):
         for i in range(repeat):
             try:
                 print(D)
-                page = req.urlopen("https://r.sine.com")                        
-                if page.code == 200:
-                    process_page(page, D)
-                else:
-                    D.failure += 1
+                content = fetch_content()
+                assert content, "Could not fetch content."
+                process_page(content, D)
             except Exception as ex:
                 D.failure += 1
                 print("Handling error,", ex)
@@ -61,9 +59,46 @@ def main(delay=5, repeat=1000000):
     open("metric.txt", "w").write(D.data())
 
 #%%
-def process_page(page, D):
-    content = page.read()
-    key = hash(content)
+def fetch_content(attempts=1):
+    for i in range(attempts):
+        try:
+            page = req.urlopen("https://r.sine.com")
+            assert page.code == 200, "Fetched page did not return with code 200"
+            return page.read()
+        except Exception as e:
+            print("Attempt {} (of max {}) to fetch page failed.\n".format(i+1, attempts),
+                  "Failure: {}\n".format(e),
+                  file=sys.stderr)
+    print("Maximum failures reached.  Returning None.",
+          file=sys.stderr)
+    return None
+
+
+_hex_len = len(hex(sys.maxsize))
+def myHash(content):
+    '''We use a modified hash function to convert content into an
+    indentifying string.  Content is hashed using Python's standard
+    hashing function.  This is converted to hex for shorter strings
+    and, well, because hex.  On *nix machines, files with a leading
+    negative are an annoyance.  To this end, we prepend the string
+    \"rs\" to the hash key.  Additionally, for uniformity in file
+    length, we prepend zeros on short keys and add \"+\" to those
+    hashs that are positive.
+
+    '''
+
+    n = hash(content)
+    key = hex(n)
+    if not key[0] == "-":
+        key = "+" + key
+    if len(key) < _hex_len + 1:
+        # [+-]0x[key]
+        key = key[:3] + "0" * (_hex_len + 1 - len(key)) + key[3:]
+    key = "rs" + key
+    return key
+
+def process_page(content, D):
+    key = myHash(content)
     if D.has(key):
         D.collide += 1
         D.time_to_collide.append(D.since_last_collision)
@@ -74,7 +109,3 @@ def process_page(page, D):
         D.success += 1
         D.since_last_collision += 1
         open("cache/{}".format(key), "wb").write(content)
-
-
-def hash_to_filename(h):
-    
