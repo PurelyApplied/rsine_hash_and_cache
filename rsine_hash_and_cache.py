@@ -3,9 +3,21 @@
 Content is hashed and compared against an existing library.
 If it is new, it is saved.  If not, the collision is noted.'''
 
+try:
+    import magic
+except:
+    print("Could not import file magic.",
+          "All files will have extension 'unknown'")
 
 import os, sys, time
 import urllib.request as req
+
+def get_extension(item):
+    try:
+        pass # Do file magic here
+        magic.stuff()
+    except:
+        return ".unknown"
 
 class Data:
     def __init__(self):
