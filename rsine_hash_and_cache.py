@@ -11,14 +11,15 @@ except:
 
 import os, sys, time
 import urllib.request as req
+import argparse
 
 #%%
-def main(delay=5, repeat=1000000):
+def main(delay=5, passes=100):
     print("Current working directory:", os.getcwd())
     try:
         D = Data()
         D.load("cache")
-        for i in range(repeat):
+        for i in range(passes):
             fetch_one(D, delay)
     except Exception as e:
         print("Critical failure", e)
@@ -53,7 +54,7 @@ def fetch_content(attempts=1):
 def get_extension(content):
     try:
         with magic.Magic() as M:
-            return M.id_buffer(content).split()[0].lower()
+            return "." + M.id_buffer(content).split()[0].lower()
     except Exception as e:
         print("Error:", e, file=sys.stderr)
         return ".unknown"
@@ -94,7 +95,7 @@ def process_page(content, D):
         D.add(key)
         D.success += 1
         D.since_last_collision += 1
-        open("cache/{}".format(key, get_extension(content)),
+        open("cache/{}{}".format(key, get_extension(content)),
              "wb").write(content)
 
 
@@ -133,3 +134,15 @@ class Data:
         return s
 
 
+
+if __name__ == "__main__":
+    parse = argparse.ArgumentParser()
+    parse.add_argument("delay",
+                       help="Delay between http calls; increase to keep bandwidth low.",
+                       type=int)
+    parse.add_argument("passes",
+                       help="Number of download attempts to make.",
+                       type=int)
+    args = parse.parse_args()
+    print("main(delay={}, passes={})".format(args.delay, args.passes))
+    main(args.delay, args.passes)
