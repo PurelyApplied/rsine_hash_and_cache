@@ -12,44 +12,6 @@ except:
 import os, sys, time
 import urllib.request as req
 
-def get_extension(item):
-    try:
-        pass # Do file magic here
-        magic.stuff()
-    except:
-        return ".unknown"
-
-class Data:
-    def __init__(self):
-        self.success=0
-        self.collide=0
-        self.failure=0
-        self.since_last_collision=0
-        self.time_to_collide = []
-        self.cache = set()
-
-    def __repr__(self):
-        return "<Data +{}/-{}/!{}/n{}/t{}>".format(self.success, self.collide, self.failure, len(self.cache), self.since_last_collision)
-
-    def has(self, key):
-        return (str(key) in self.cache)
-
-    def add(self, key):
-        self.cache.add(key)
-
-    def load(self, folder):
-        self.cache.update(os.listdir(folder))
-
-    def data(self):
-        s  = "Failure: {}\n".format(self.failure)
-        s += "Success: {}\n".format(self.success)
-        s += "Collide: {}\n".format(self.collide)
-        s += "Average time to collision: {}\n".format( sum(self.time_to_collide) / len(self.time_to_collide))
-        s += "Recent Collisions: {}\n".format(self.time_to_collide[-5:])
-        s += "Recent average: {}\n".format( sum(self.time_to_collide[-5:]) / len(self.time_to_collide[-5:]))
-        return s
-
-
 #%%
 def main(delay=5, repeat=1000000):
     print("Current working directory:", os.getcwd())
@@ -57,18 +19,21 @@ def main(delay=5, repeat=1000000):
         D = Data()
         D.load("cache")
         for i in range(repeat):
-            try:
-                print(D)
-                content = fetch_content()
-                assert content, "Could not fetch content."
-                process_page(content, D)
-            except Exception as ex:
-                D.failure += 1
-                print("Handling error,", ex)
-            time.sleep(delay)
+            fetch_one(D, delay)
     except Exception as e:
         print("Critical failure", e)
     open("metric.txt", "w").write(D.data())
+
+def fetch_one(D, delay=0):
+    try:
+        print(D)
+        content = fetch_content()
+        assert content, "Could not fetch content."
+        process_page(content, D)
+    except Exception as ex:
+        D.failure += 1
+        print("Handling error,", ex)
+    time.sleep(delay)
 
 #%%
 def fetch_content(attempts=1):
@@ -84,6 +49,15 @@ def fetch_content(attempts=1):
     print("Maximum failures reached.  Returning None.",
           file=sys.stderr)
     return None
+
+def get_extension(content):
+    try:
+        with magic.Magic() as M:
+            return M.id_buffer(content).split()[0].lower()
+    except Exception as e:
+        print("Error:", e, file=sys.stderr)
+        return ".unknown"
+
 
 
 _hex_len = len(hex(sys.maxsize))
@@ -120,4 +94,42 @@ def process_page(content, D):
         D.add(key)
         D.success += 1
         D.since_last_collision += 1
-        open("cache/{}".format(key), "wb").write(content)
+        open("cache/{}".format(key, get_extension(content)),
+             "wb").write(content)
+
+
+class Data:
+    def __init__(self):
+        self.success=0
+        self.collide=0
+        self.failure=0
+        self.since_last_collision=0
+        self.time_to_collide = []
+        self.cache = set()
+
+    def __repr__(self):
+        return "<Data +{}/-{}/!{}/n{}/t{}>".format(self.success,
+                                                   self.collide,
+                                                   self.failure,
+                                                   len(self.cache),
+                                                   self.since_last_collision)
+
+    def has(self, key):
+        return (str(key) in self.cache)
+
+    def add(self, key):
+        self.cache.add(key)
+
+    def load(self, folder):
+        self.cache.update(os.listdir(folder))
+
+    def data(self):
+        s  = "Failure: {}\n".format(self.failure)
+        s += "Success: {}\n".format(self.success)
+        s += "Collide: {}\n".format(self.collide)
+        s += "Average time to collision: {}\n".format( sum(self.time_to_collide) / len(self.time_to_collide))
+        s += "Recent Collisions: {}\n".format(self.time_to_collide[-5:])
+        s += "Recent average: {}\n".format( sum(self.time_to_collide[-5:]) / len(self.time_to_collide[-5:]))
+        return s
+
+
