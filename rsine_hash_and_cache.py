@@ -30,7 +30,7 @@ def fetch_one(D, delay=0):
         assert content, "Could not fetch content."
         process_page(content, D)
     except Exception as ex:
-        D.failure += 1
+        D.fail()
         print("Handling error,", ex, file=sys.stderr)
     time.sleep(delay)
 
@@ -85,22 +85,17 @@ def myHash(content):
 def process_page(content, D):
     key = myHash(content)
     if D.has(key):
-        D.collide += 1
-        D.time_to_collide.append(D.since_last_collision)
-        D.since_last_collision = 0
-        print("%%%%%%%%%%\n",D.data(),"%%%%%%%%%%", file=sys.stderr)
+        D.collide()
     else:
-        D.add(key)
-        D.success += 1
-        D.since_last_collision += 1
+        D.success()
         open("cache/{}{}".format(key, get_extension(content)),
              "wb").write(content)
 
 class Data:
     def __init__(self, cache=None):
-        self.success=0
-        self.collide=0
-        self.failure=0
+        self.success_count=0
+        self.collision_count=0
+        self.failure_count=0
         self.since_last_collision=0
         self.time_to_collide = []
         self.cache = set()
@@ -109,9 +104,9 @@ class Data:
 
     def __repr__(self):
         return "<Data +{}/-{}/!{}/n{}/t{}>".format(
-            self.success,
-            self.collide,
-            self.failure,
+            self.success_count,
+            self.collision_count,
+            self.failure_count,
             len(self.cache),
             self.since_last_collision)
 
@@ -127,14 +122,31 @@ class Data:
         self.cache.update(keys)
 
     def data(self):
-        s  = "Failure: {}\n".format(self.failure)
-        s += "Success: {}\n".format(self.success)
-        s += "Collide: {}\n".format(self.collide)
+        s  = "Failure: {}\n".format(self.failure_count)
+        s += "Success: {}\n".format(self.success_count)
+        s += "Collide: {}\n".format(self.collision_count)
         s += "Average time to collision: {}\n".format( sum(self.time_to_collide) / len(self.time_to_collide))
         s += "Recent Collisions: {}\n".format(self.time_to_collide[-5:])
-        s += "Recent average: {}\n".format( sum(self.time_to_collide[-5:]) / len(self.time_to_collide[-5:]))
+        s += "Recent average: {}\n".format(
+            sum(self.time_to_collide[-5:]) / len(self.time_to_collide[-5:]) 
+            if len(self.time_to_collide[-5:]) != 0 
+            else "No collisions" )
         return s
 
+    def fail(self):
+        D.failure_count += 1
+
+    def collide(self, print_data=True):
+        D.collision_count += 1
+        D.time_to_collide.append(D.since_last_collision)
+        D.since_last_collision = 0
+        if print_data:
+            print("%%%%%%%%%%\n",D.data(),"%%%%%%%%%%", file=sys.stderr)
+        
+    def success(self):
+        D.add(key)
+        D.success_count += 1
+        D.since_last_collision += 1
 
 
 if __name__ == "__main__":
