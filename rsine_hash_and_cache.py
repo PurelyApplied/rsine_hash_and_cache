@@ -32,7 +32,8 @@ def fetch_one(D, delay=0):
     except Exception as ex:
         D.fail()
         print("Handling error,", ex, file=sys.stderr)
-    time.sleep(delay)
+    if delay:
+        time.sleep(delay)
 
 #%%
 def fetch_content(attempts=1):
@@ -120,6 +121,7 @@ class Data:
         files = os.listdir(folder)
         keys = [ f.split('.')[0] for f in files if f[:2] == "rs" ]
         self.cache.update(keys)
+        
 
     def data(self):
         s  = "Failure: {}\n".format(self.failure_count)
@@ -128,8 +130,8 @@ class Data:
         s += "Average time to collision: {}\n".format( sum(self.time_to_collide) / len(self.time_to_collide))
         s += "Recent Collisions: {}\n".format(self.time_to_collide[-5:])
         s += "Recent average: {}\n".format(
-            sum(self.time_to_collide[-5:]) / len(self.time_to_collide[-5:]) 
-            if len(self.time_to_collide[-5:]) != 0 
+            sum(self.time_to_collide[-5:]) / len(self.time_to_collide[-5:])
+            if len(self.time_to_collide[-5:]) != 0
             else "No collisions" )
         return s
 
@@ -142,22 +144,28 @@ class Data:
         D.since_last_collision = 0
         if print_data:
             print("%%%%%%%%%%\n",D.data(),"%%%%%%%%%%", file=sys.stderr)
-        
+
     def success(self):
         D.add(key)
         D.success_count += 1
         D.since_last_collision += 1
 
+try:
+    full_path = os.path.abspath(__file__)
+    root_dir = os.path.dirname(full_path)
+    os.chdir(root_dir)
+except:
+    pass
 
 if __name__ == "__main__":
     parse = argparse.ArgumentParser()
-    parse.add_argument("delay",
-                       help="Delay between http calls; increase to keep bandwidth low.",
-                       type=int)
     parse.add_argument("passes",
                        help="Number of download attempts to make.",
                        type=int)
-    args = parse.parse_args()
+    parse.add_argument("--delay",
+                       help="Seconds to delay between http calls; increase to keep bandwidth low.",
+                       type=int,
+                       default=5)
     print("Current working directory:", os.getcwd(), file=sys.stderr)
-    print("main(delay={}, passes={})".format(args.delay, args.passes), file=sys.stderr)
-    main(args.delay, args.passes)
+    args = parse.parse_args()
+    main(args.passes, args.delay)
