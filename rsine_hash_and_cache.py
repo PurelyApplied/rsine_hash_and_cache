@@ -14,26 +14,24 @@ import urllib.request as req
 import argparse
 
 #%%
-def main(delay=5, passes=100):
-    print("Current working directory:", os.getcwd())
+def main(passes=100, delay=5):
+    D = Data(cache="cache")
     try:
-        D = Data()
-        D.load("cache")
         for i in range(passes):
             fetch_one(D, delay)
     except Exception as e:
-        print("Critical failure", e)
-    open("metric.txt", "w").write(D.data())
+        print("Critical failure", e, file=sys.stderr)
+    print(D.data(), file=sys.stderr)
 
 def fetch_one(D, delay=0):
     try:
-        print(D)
+        print(D, file=sys.stderr)
         content = fetch_content()
         assert content, "Could not fetch content."
         process_page(content, D)
     except Exception as ex:
         D.failure += 1
-        print("Handling error,", ex)
+        print("Handling error,", ex, file=sys.stderr)
     time.sleep(delay)
 
 #%%
@@ -51,6 +49,7 @@ def fetch_content(attempts=1):
           file=sys.stderr)
     return None
 
+#%%
 def get_extension(content):
     try:
         with magic.Magic() as M:
@@ -58,8 +57,6 @@ def get_extension(content):
     except Exception as e:
         print("Error:", e, file=sys.stderr)
         return ".unknown"
-
-
 
 _hex_len = len(hex(sys.maxsize))
 def myHash(content):
@@ -84,13 +81,14 @@ def myHash(content):
     key = "rs" + key
     return key
 
+#%%
 def process_page(content, D):
     key = myHash(content)
     if D.has(key):
         D.collide += 1
         D.time_to_collide.append(D.since_last_collision)
         D.since_last_collision = 0
-        print("%%%%%%%%%%\n",D.data(),"%%%%%%%%%%")
+        print("%%%%%%%%%%\n",D.data(),"%%%%%%%%%%", file=sys.stderr)
     else:
         D.add(key)
         D.success += 1
@@ -98,22 +96,24 @@ def process_page(content, D):
         open("cache/{}{}".format(key, get_extension(content)),
              "wb").write(content)
 
-
 class Data:
-    def __init__(self):
+    def __init__(self, cache=None):
         self.success=0
         self.collide=0
         self.failure=0
         self.since_last_collision=0
         self.time_to_collide = []
         self.cache = set()
+        if cache:
+            self.load(cache)
 
     def __repr__(self):
-        return "<Data +{}/-{}/!{}/n{}/t{}>".format(self.success,
-                                                   self.collide,
-                                                   self.failure,
-                                                   len(self.cache),
-                                                   self.since_last_collision)
+        return "<Data +{}/-{}/!{}/n{}/t{}>".format(
+            self.success,
+            self.collide,
+            self.failure,
+            len(self.cache),
+            self.since_last_collision)
 
     def has(self, key):
         return (str(key) in self.cache)
@@ -122,7 +122,9 @@ class Data:
         self.cache.add(key)
 
     def load(self, folder):
-        self.cache.update(os.listdir(folder))
+        files = os.listdir(folder)
+        keys = [ f.split('.')[0] for f in files if f[:2] == "rs" ]
+        self.cache.update(keys)
 
     def data(self):
         s  = "Failure: {}\n".format(self.failure)
@@ -144,5 +146,6 @@ if __name__ == "__main__":
                        help="Number of download attempts to make.",
                        type=int)
     args = parse.parse_args()
-    print("main(delay={}, passes={})".format(args.delay, args.passes))
+    print("Current working directory:", os.getcwd(), file=sys.stderr)
+    print("main(delay={}, passes={})".format(args.delay, args.passes), file=sys.stderr)
     main(args.delay, args.passes)
