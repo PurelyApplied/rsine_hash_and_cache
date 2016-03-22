@@ -84,6 +84,19 @@ def myHash(content):
     return key
 
 #%%
+def fix():
+    files = [ f for f in os.listdir("cache") ]
+    #files = [ f for f in os.listdir("cache") if f.split(".")[1] == "unknown" ]
+    for f in files:
+        handle = open("cache/" + f, 'rb')
+        content = handle.read()
+        ext = get_extension(content)
+        new_name = f.split(".")[0] + ext
+        print("Renaming file {} to {}".format(f, new_name))
+        os.rename("cache/" + f, "cache/" + new_name)
+
+
+#%%
 def process_page(content, D):
     key = myHash(content)
     if D.has(key):
@@ -170,7 +183,13 @@ if __name__ == "__main__":
                        help="Seconds to delay between http calls; increase to keep bandwidth low.",
                        type=int,
                        default=5)
+    parse.add_argument("--fix",
+                       help="Run to rename \".unknown\" files to appropraite extension.",
+                       action="store_true")
     print("Current working directory:", os.getcwd(), file=sys.stderr)
     args = parse.parse_args()
-    print("Do {} passes, one every {} seconds.".format(args.passes, args.delay))
-    main(args.passes, args.delay)
+    if args.fix:
+        fix()
+    else:
+        print("Do {} passes, one every {} seconds.".format(args.passes, args.delay))
+        main(args.passes, args.delay)
