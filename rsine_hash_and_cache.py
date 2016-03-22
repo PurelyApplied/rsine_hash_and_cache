@@ -21,6 +21,7 @@ def main(passes=100, delay=5):
             fetch_one(D, delay)
     except Exception as e:
         print("Critical failure", e, file=sys.stderr)
+        raise e
     print(D.data(), file=sys.stderr)
 
 def fetch_one(D, delay=0):
@@ -88,7 +89,7 @@ def process_page(content, D):
     if D.has(key):
         D.collide()
     else:
-        D.success()
+        D.success(key)
         open("cache/{}{}".format(key, get_extension(content)),
              "wb").write(content)
 
@@ -127,7 +128,10 @@ class Data:
         s  = "Failure: {}\n".format(self.failure_count)
         s += "Success: {}\n".format(self.success_count)
         s += "Collide: {}\n".format(self.collision_count)
-        s += "Average time to collision: {}\n".format( sum(self.time_to_collide) / len(self.time_to_collide))
+        s += "Average time to collision: {}\n".format(
+            sum(self.time_to_collide) / len(self.time_to_collide)
+            if len(self.time_to_collide) != 0
+            else "Immediate")
         s += "Recent Collisions: {}\n".format(self.time_to_collide[-5:])
         s += "Recent average: {}\n".format(
             sum(self.time_to_collide[-5:]) / len(self.time_to_collide[-5:])
@@ -136,19 +140,19 @@ class Data:
         return s
 
     def fail(self):
-        D.failure_count += 1
+        self.failure_count += 1
 
     def collide(self, print_data=True):
-        D.collision_count += 1
-        D.time_to_collide.append(D.since_last_collision)
-        D.since_last_collision = 0
+        self.collision_count += 1
+        self.time_to_collide.append(self.since_last_collision)
+        self.since_last_collision = 0
         if print_data:
-            print("%%%%%%%%%%\n",D.data(),"%%%%%%%%%%", file=sys.stderr)
+            print("%%%%%%%%%%\n",self.data(),"%%%%%%%%%%", file=sys.stderr)
 
-    def success(self):
-        D.add(key)
-        D.success_count += 1
-        D.since_last_collision += 1
+    def success(self, key):
+        self.add(key)
+        self.success_count += 1
+        self.since_last_collision += 1
 
 try:
     full_path = os.path.abspath(__file__)
@@ -168,4 +172,5 @@ if __name__ == "__main__":
                        default=5)
     print("Current working directory:", os.getcwd(), file=sys.stderr)
     args = parse.parse_args()
+    print("Do {} passes, one every {} seconds.".format(args.passes, args.delay))
     main(args.passes, args.delay)
